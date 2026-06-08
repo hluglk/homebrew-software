@@ -2,30 +2,33 @@ name: Bump cask on new release
 
 on:
   schedule:
-    # 北京时间每天8点和20点运行
+    # 北京时间每天8点和20点运行（UTC 0:00 和 12:00）
     - cron: '0 0,12 * * *'
   workflow_dispatch:  # 支持手动触发
 
 jobs:
   bump:
-    runs-on: macos-latest  # 必须在macOS上运行
+    runs-on: macos-latest
     steps:
-      - name: Checkout tap
+      - name: Checkout tap repository
         uses: actions/checkout@v4
 
-      - name: Setup Homebrew
+      - name: Setup Homebrew and tap self
         run: |
-          echo "$(brew --repo)/Library/Taps/homebrew/homebrew-core/bin" >> $GITHUB_PATH
+          # 将当前仓库添加为本地 tap（假设 tap 名为 homebrew-software/software，请根据实际修改）
+          # 这里用绝对路径，避免名称冲突
+          brew tap --force "$(basename "$(pwd)")" "$(pwd)"
 
       - name: Check for update
         id: check
         run: |
-          # 获取最新版本号并写入环境变量
-          LATEST_VERSION=$(brew livecheck --newer-only siyuan-unlock 2>/dev/null | \
-                           awk '{print $NF}' || echo "")
-          if [ -n "$LATEST_VERSION" ]; then
-            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-            echo "Update available: $LATEST_VERSION"
+          # 使用 cask 文件路径或 tap 后的 cask 名
+          LATEST_INFO=$(brew livecheck --newer-only siyuan-unlock 2>/dev/null | grep '^siyuan-unlock:' || true)
+          if [ -n "$LATEST_INFO" ]; then
+            # 输出格式: siyuan-unlock: 3.6.5 -> 3.7.0
+            NEW_VERSION=$(echo "$LATEST_INFO" | awk -F'->' '{print $2}' | tr -d ' ')
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "Update available: $NEW_VERSION"
           else
             echo "No update needed."
           fi
@@ -33,9 +36,10 @@ jobs:
       - name: Run bump-cask-pr
         if: steps.check.outputs.new_version
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用脚本自动生成的临时token
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_DEVELOPER: 1  # 显式开启开发者模式
         run: |
           brew bump-cask-pr siyuan-unlock \
-            --version=${{ steps.check.outputs.new_version }} \
+            --version="${{ steps.check.outputs.new_version }}" \
             --no-fork \
             --no-audit
