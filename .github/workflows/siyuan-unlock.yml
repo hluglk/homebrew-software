@@ -64,7 +64,7 @@ jobs:
       - name: Run bump-cask-pr
         if: steps.compare.outputs.new_version
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
           # 确保 new_version 非空（再次检查）
           VERSION="${{ steps.compare.outputs.new_version }}"
