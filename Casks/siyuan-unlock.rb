@@ -1,6 +1,6 @@
 cask "siyuan-unlock" do
-  version "1.0.0"
-  sha256 "a1b2c3d4..."   # 安装文件的 SHA256 校验值，用于确保文件完整性
+  version "3.6.4"
+  sha256 ""   # 安装文件的 SHA256 校验值，用于确保文件完整性
 
   url "https://github.com/appdev/siyuan-unlock/releases/download/v#{version}/siyuan-#{version}-mac-arm64.dmg"
   name "siyuan-unlock"
