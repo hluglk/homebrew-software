@@ -67,7 +67,13 @@ jobs:
         run: |
           brew tap --force "${GITHUB_REPOSITORY}"
           brew tap-info "${GITHUB_REPOSITORY}"
-
+      - name: Delete existing remote branch (if any)
+        if: steps.compare.outputs.new_version
+        run: |
+          NEW_VERSION="${{ steps.compare.outputs.new_version }}"
+          BRANCH_NAME="bump-siyuan-unlock-${NEW_VERSION}"
+          # 删除远程分支（忽略错误，分支不存在时不影响后续）
+          git push origin --delete "$BRANCH_NAME" 2>/dev/null || echo "Branch not found, continuing..."
       - name: Run bump-cask-pr
         if: steps.compare.outputs.new_version
         env:
