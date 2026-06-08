@@ -2,40 +2,47 @@ name: Bump cask on new release
 
 on:
   schedule:
-    # 北京时间每天8点和20点运行
     - cron: '0 0,12 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   bump:
-    runs-on: macos-latest  # 必须在macOS上运行
+    runs-on: macos-latest
+    permissions:
+      contents: write      # 用于 push 分支
+      pull-requests: write # 用于创建 PR
     steps:
       - name: Checkout tap
         uses: actions/checkout@v4
 
       - name: Setup Homebrew
         run: |
-          echo "$(brew --repo)/Library/Taps/homebrew/homebrew-core/bin" >> $GITHUB_PATH
+          # 将当前仓库添加为 Homebrew tap（临时）
+          brew tap --force "${GITHUB_REPOSITORY}"
+          # 确保 brew 能找到 cask
+          brew update --force --quiet
 
       - name: Check for update
         id: check
         run: |
-          # 获取最新版本号并写入环境变量
-          LATEST_VERSION=$(brew livecheck --newer-only siyuan-unlock 2>/dev/null | \
-                           awk '{print $NF}' || echo "")
-          if [ -n "$LATEST_VERSION" ]; then
+          # 使用绝对路径或相对路径指向 cask 文件，避免搜索其他 tap
+          CASK_FILE="./Casks/siyuan-unlock.rb"
+          # 直接运行 livecheck 并获取最新版本号（--quiet 只输出版本号）
+          LATEST_VERSION=$(brew livecheck --newer-only --quiet "$CASK_FILE" 2>/dev/null || echo "")
+          if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "false" ]; then
             echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-            echo "Update available: $LATEST_VERSION"
+            echo "✅ 发现新版本: $LATEST_VERSION"
           else
-            echo "No update needed."
+            echo "⏺ 无更新或检测失败"
           fi
 
       - name: Run bump-cask-pr
         if: steps.check.outputs.new_version
         env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用脚本自动生成的临时token
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          brew bump-cask-pr siyuan-unlock \
-            --version=${{ steps.check.outputs.new_version }} \
-            --no-fork \
-            --no-audit
+          CASK_FILE="./Casks/siyuan-unlock.rb"
+          brew bump-cask-pr "$CASK_FILE" \
+            --version="${{ steps.check.outputs.new_version }}" \
+            --no-audit \
+            --no-fork
