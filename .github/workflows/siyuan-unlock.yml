@@ -62,17 +62,25 @@ jobs:
           # 删除远程分支（忽略错误，分支不存在时不影响后续）
           git push origin --delete "$BRANCH_NAME" 2>/dev/null || echo "Branch not found, continuing..."
       - name: Run bump-cask-pr
+        id: bump
         if: steps.compare.outputs.new_version
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
-          # 确保 new_version 非空（再次检查）
-          VERSION="${{ steps.compare.outputs.new_version }}"
-          if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
-            echo "错误：版本号无效 '$VERSION'"
-            exit 1
-          fi
-          brew bump-cask-pr siyuan-unlock \
-            --version="$VERSION" \
+          # 运行 bump-cask-pr 并捕获输出，从中提取 PR URL
+          OUTPUT=$(brew bump-cask-pr siyuan-unlock \
+            --version="${{ steps.compare.outputs.new_version }}" \
             --no-audit \
-            --no-fork
+            --no-fork 2>&1 | tee /dev/stderr)
+          # 提取 PR URL（例如 https://github.com/owner/repo/pull/123）
+          PR_URL=$(echo "$OUTPUT" | grep -o 'https://github.com/[^ ]*/pull/[0-9]*' | head -1)
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+      - name: Auto-merge PR
+        if: steps.bump.outputs.pr_url
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        run: |
+          PR_URL="${{ steps.bump.outputs.pr_url }}"
+          PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+          # 自动合并（使用 merge 策略，可改为 squash 或 rebase）
+          gh pr merge "$PR_NUMBER" --auto --merge --delete-branch
