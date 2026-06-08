@@ -23,27 +23,14 @@ jobs:
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
           echo "当前版本: $CURRENT_VERSION"
 
-      - name: Get latest version from GitHub API
+      - name: Get latest version using gh CLI
         id: latest_version
         run: |
-          REPO="appdev/siyuan-unlock"
-          # 获取 release 信息，包含错误处理
-          RESPONSE=$(curl -s -w "%{http_code}" "https://api.github.com/repos/$REPO/releases/latest")
-          HTTP_CODE="${RESPONSE: -3}"
-          BODY="${RESPONSE%???}"
-          if [[ "$HTTP_CODE" != "200" ]]; then
-            echo "GitHub API 返回 HTTP $HTTP_CODE"
-            echo "body: $BODY"
-            exit 1
-          fi
-          LATEST_TAG=$(echo "$BODY" | jq -r .tag_name)
-          if [[ "$LATEST_TAG" == "null" || -z "$LATEST_TAG" ]]; then
-            echo "无法解析 tag_name，响应内容: $BODY"
-            exit 1
-          fi
-          LATEST_VERSION=${LATEST_TAG#v}
+          LATEST_VERSION=$(gh release list --repo "appdev/siyuan-unlock" \
+            --limit 1 --json tagName --jq '.[0].tagName' | sed 's/^v//')
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "最新版本: $LATEST_VERSION"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Compare versions
         id: compare
