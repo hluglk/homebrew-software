@@ -25,15 +25,24 @@ jobs:
       - name: Check for update
         id: check
         run: |
-          # 使用绝对路径或相对路径指向 cask 文件，避免搜索其他 tap
+          # 先确认 cask 文件存在
           CASK_FILE="./Casks/siyuan-unlock.rb"
-          # 直接运行 livecheck 并获取最新版本号（--quiet 只输出版本号）
-          LATEST_VERSION=$(brew livecheck --newer-only --quiet "$CASK_FILE" 2>/dev/null || echo "")
-          if [ -n "$LATEST_VERSION" ] && [ "$LATEST_VERSION" != "false" ]; then
+          echo "📄 检查 cask 文件: $CASK_FILE"
+          ls -la "$CASK_FILE" || echo "文件不存在！"
+      
+          # 直接运行 livecheck，不屏蔽任何输出
+          brew livecheck --newer-only "$CASK_FILE"
+          
+          # 捕获输出（注意上面命令会直接打印，但我们仍要获取版本号）
+          LATEST_VERSION=$(brew livecheck --newer-only "$CASK_FILE" 2>&1 | tail -n1)
+          echo "原始输出: $LATEST_VERSION"
+          
+          # 如果输出看起来像版本号（例如 3.6.5）
+          if [[ "$LATEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
             echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
             echo "✅ 发现新版本: $LATEST_VERSION"
           else
-            echo "⏺ 无更新或检测失败"
+            echo "⏺ 无更新或检测失败，输出为: $LATEST_VERSION"
           fi
 
       - name: Run bump-cask-pr
