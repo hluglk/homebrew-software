@@ -9,49 +9,51 @@ jobs:
   bump:
     runs-on: macos-latest
     permissions:
-      contents: write      # 用于 push 分支
-      pull-requests: write # 用于创建 PR
+      contents: write
+      pull-requests: write
     steps:
       - name: Checkout tap
         uses: actions/checkout@v4
 
-      - name: Setup Homebrew
+      - name: Get current version from cask
+        id: current_version
         run: |
-          # 将当前仓库添加为 Homebrew tap（临时）
-          brew tap --force "${GITHUB_REPOSITORY}"
-          # 确保 brew 能找到 cask
-          brew update --force --quiet
-
-      - name: Check for update
-        id: check
-        run: |
-          # 先确认 cask 文件存在
           CASK_FILE="./Casks/siyuan-unlock.rb"
-          echo "📄 检查 cask 文件: $CASK_FILE"
-          ls -la "$CASK_FILE" || echo "文件不存在！"
-      
-          # 直接运行 livecheck，不屏蔽任何输出
-          brew livecheck --newer-only "$CASK_FILE"
-          
-          # 捕获输出（注意上面命令会直接打印，但我们仍要获取版本号）
-          LATEST_VERSION=$(brew livecheck --newer-only "$CASK_FILE" 2>&1 | tail -n1)
-          echo "原始输出: $LATEST_VERSION"
-          
-          # 如果输出看起来像版本号（例如 3.6.5）
-          if [[ "$LATEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-            echo "✅ 发现新版本: $LATEST_VERSION"
+          CURRENT_VERSION=$(grep 'version' "$CASK_FILE" | head -1 | awk -F'"' '{print $2}')
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "当前版本: $CURRENT_VERSION"
+
+      - name: Get latest version from GitHub API
+        id: latest_version
+        run: |
+          REPO="appdev/siyuan-unlock"
+          LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | jq -r .tag_name)
+          LATEST_VERSION=${LATEST_TAG#v}
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "最新版本: $LATEST_VERSION"
+
+      - name: Compare versions
+        id: compare
+        run: |
+          if [[ "${{ steps.current_version.outputs.current_version }}" != "${{ steps.latest_version.outputs.latest_version }}" ]]; then
+            echo "new_version=${{ steps.latest_version.outputs.latest_version }}" >> $GITHUB_OUTPUT
+            echo "✅ 需要更新"
           else
-            echo "⏺ 无更新或检测失败，输出为: $LATEST_VERSION"
+            echo "⏺ 已是最新"
           fi
 
+      - name: Setup Homebrew tap
+        if: steps.compare.outputs.new_version
+        run: |
+          brew tap --force "${GITHUB_REPOSITORY}"
+          brew tap-info "${GITHUB_REPOSITORY}"
+
       - name: Run bump-cask-pr
-        if: steps.check.outputs.new_version
+        if: steps.compare.outputs.new_version
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CASK_FILE="./Casks/siyuan-unlock.rb"
-          brew bump-cask-pr "$CASK_FILE" \
-            --version="${{ steps.check.outputs.new_version }}" \
+          brew bump-cask-pr siyuan-unlock \
+            --version="${{ steps.compare.outputs.new_version }}" \
             --no-audit \
             --no-fork
