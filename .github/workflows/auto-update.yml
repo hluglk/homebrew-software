@@ -1,4 +1,4 @@
-name: Update casks from upstream releases
+name: Auto-update cask on upstream release
 
 on:
   schedule:
@@ -7,13 +7,20 @@ on:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Update cask
-        uses: Homebrew/actions/bump-casks@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          casks: siyuan-unlock
-          tap: hluglk/homebrew-soft
-          livecheck: true
+          fetch-depth: 0
+
+      - name: Setup Homebrew
+        uses: Homebrew/actions/setup-homebrew@master
+
+      - name: Update cask
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ github.workspace }}
+          # 直接运行，不需要 --online 和 --tap
+          brew bump-cask-pr siyuan-unlock --no-fork --no-audit
