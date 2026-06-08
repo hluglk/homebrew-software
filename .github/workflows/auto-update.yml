@@ -27,7 +27,20 @@ jobs:
         id: latest_version
         run: |
           REPO="appdev/siyuan-unlock"
-          LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | jq -r .tag_name)
+          # 获取 release 信息，包含错误处理
+          RESPONSE=$(curl -s -w "%{http_code}" "https://api.github.com/repos/$REPO/releases/latest")
+          HTTP_CODE="${RESPONSE: -3}"
+          BODY="${RESPONSE%???}"
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "GitHub API 返回 HTTP $HTTP_CODE"
+            echo "body: $BODY"
+            exit 1
+          fi
+          LATEST_TAG=$(echo "$BODY" | jq -r .tag_name)
+          if [[ "$LATEST_TAG" == "null" || -z "$LATEST_TAG" ]]; then
+            echo "无法解析 tag_name，响应内容: $BODY"
+            exit 1
+          fi
           LATEST_VERSION=${LATEST_TAG#v}
           echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
           echo "最新版本: $LATEST_VERSION"
@@ -35,11 +48,18 @@ jobs:
       - name: Compare versions
         id: compare
         run: |
-          if [[ "${{ steps.current_version.outputs.current_version }}" != "${{ steps.latest_version.outputs.latest_version }}" ]]; then
-            echo "new_version=${{ steps.latest_version.outputs.latest_version }}" >> $GITHUB_OUTPUT
-            echo "✅ 需要更新"
+          CURRENT="${{ steps.current_version.outputs.current_version }}"
+          LATEST="${{ steps.latest_version.outputs.latest_version }}"
+          # 防御：如果 LATEST 为空或 null，终止
+          if [[ -z "$LATEST" || "$LATEST" == "null" ]]; then
+            echo "最新版本无效，终止流程"
+            exit 1
+          fi
+          if [[ "$CURRENT" != "$LATEST" ]]; then
+            echo "new_version=$LATEST" >> $GITHUB_OUTPUT
+            echo "✅ 需要更新: $CURRENT → $LATEST"
           else
-            echo "⏺ 已是最新"
+            echo "⏺ 已是最新: $CURRENT"
           fi
 
       - name: Setup Homebrew tap
@@ -53,7 +73,13 @@ jobs:
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # 确保 new_version 非空（再次检查）
+          VERSION="${{ steps.compare.outputs.new_version }}"
+          if [[ -z "$VERSION" || "$VERSION" == "null" ]]; then
+            echo "错误：版本号无效 '$VERSION'"
+            exit 1
+          fi
           brew bump-cask-pr siyuan-unlock \
-            --version="${{ steps.compare.outputs.new_version }}" \
+            --version="$VERSION" \
             --no-audit \
             --no-fork
