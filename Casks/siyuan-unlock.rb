@@ -14,8 +14,7 @@ cask "siyuan-unlock" do
   # 可选但推荐的字段，用于自动检查更新
   livecheck do
     url :homepage
-    strategy :page_match
-    regex(/href=.*?siyuan[._-]v?(\d+(?:\.\d+)+).*?\.dmg/i)
+    strategy :github_latest
   end
 
   # 如果需要管理员权限，可以取消注释

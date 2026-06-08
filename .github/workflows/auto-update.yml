@@ -1,26 +1,41 @@
-name: Auto-update cask on upstream release
+name: Bump cask on new release
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    # 北京时间每天8点和20点运行
+    - cron: '0 0,12 * * *'
+  workflow_dispatch:  # 支持手动触发
 
 jobs:
-  update:
-    runs-on: macos-latest
+  bump:
+    runs-on: macos-latest  # 必须在macOS上运行
     steps:
-      - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+      - name: Checkout tap
+        uses: actions/checkout@v4
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-
-      - name: Update cask
-        env:
-          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd ${{ github.workspace }}
-          # 直接运行，不需要 --online 和 --tap
-          brew bump-cask-pr siyuan-unlock --no-fork --no-audit
+          echo "$(brew --repo)/Library/Taps/homebrew/homebrew-core/bin" >> $GITHUB_PATH
+
+      - name: Check for update
+        id: check
+        run: |
+          # 获取最新版本号并写入环境变量
+          LATEST_VERSION=$(brew livecheck --newer-only siyuan-unlock 2>/dev/null | \
+                           awk '{print $NF}' || echo "")
+          if [ -n "$LATEST_VERSION" ]; then
+            echo "new_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+            echo "Update available: $LATEST_VERSION"
+          else
+            echo "No update needed."
+          fi
+
+      - name: Run bump-cask-pr
+        if: steps.check.outputs.new_version
+        env:
+          HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 使用脚本自动生成的临时token
+        run: |
+          brew bump-cask-pr siyuan-unlock \
+            --version=${{ steps.check.outputs.new_version }} \
+            --no-fork \
+            --no-audit
