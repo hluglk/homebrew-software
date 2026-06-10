@@ -75,32 +75,6 @@ jobs:
           # 提取 PR URL（例如 https://github.com/owner/repo/pull/123）
           PR_URL=$(echo "$OUTPUT" | grep -o 'https://github.com/[^ ]*/pull/[0-9]*' | head -1)
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
-      - name: Update PR branch
-        if: steps.bump.outputs.pr_url
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-        run: |
-          PR_URL="${{ steps.bump.outputs.pr_url }}"
-          PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
-          PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
-          
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          
-          # 拉取 main 和 PR 分支的最新内容
-          git fetch origin main
-          git fetch origin "$PR_BRANCH"
-          
-          # 强制创建/更新本地分支以匹配远程 PR 分支
-          git checkout -B "$PR_BRANCH" "origin/$PR_BRANCH"
-          
-          # 合并 main 分支的最新更改
-          git merge origin/main --no-edit
-          
-          # 推送更新后的 PR 分支
-          git push origin "$PR_BRANCH"
-      
       - name: Auto-merge PR
         if: steps.bump.outputs.pr_url
         env:
@@ -108,4 +82,5 @@ jobs:
         run: |
           PR_URL="${{ steps.bump.outputs.pr_url }}"
           PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
-          gh pr merge "$PR_NUMBER" --merge --delete-branch
+          # --auto 是启用 GitHub 原生自动合并的关键
+          gh pr merge "$PR_NUMBER" --auto --merge --delete-branch
