@@ -88,9 +88,17 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           
+          # 拉取 main 和 PR 分支的最新内容
           git fetch origin main
-          git checkout "$PR_BRANCH"
+          git fetch origin "$PR_BRANCH"
+          
+          # 强制创建/更新本地分支以匹配远程 PR 分支
+          git checkout -B "$PR_BRANCH" "origin/$PR_BRANCH"
+          
+          # 合并 main 分支的最新更改
           git merge origin/main --no-edit
+          
+          # 推送更新后的 PR 分支
           git push origin "$PR_BRANCH"
       
       - name: Auto-merge PR
