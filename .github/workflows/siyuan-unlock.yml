@@ -83,4 +83,4 @@ jobs:
           PR_URL="${{ steps.bump.outputs.pr_url }}"
           PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
           # 自动合并（使用 merge 策略，可改为 squash 或 rebase）
-          gh pr merge "$PR_NUMBER" --merge --delete-branch
+          gh pr merge "$PR_NUMBER" --auto --merge --delete-branch
