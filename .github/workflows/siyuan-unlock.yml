@@ -66,15 +66,27 @@ jobs:
         if: steps.compare.outputs.new_version
         env:
           HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
         run: |
           # 运行 bump-cask-pr 并捕获输出，从中提取 PR URL
           OUTPUT=$(brew bump-cask-pr siyuan-unlock \
             --version="${{ steps.compare.outputs.new_version }}" \
             --no-audit \
             --no-fork 2>&1 | tee /dev/stderr)
-          # 提取 PR URL（例如 https://github.com/owner/repo/pull/123）
-          PR_URL=$(echo "$OUTPUT" | grep -o 'https://github.com/[^ ]*/pull/[0-9]*' | head -1)
-          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          sleep 5
+    
+          PR_URL=$(gh pr list --repo "$GITHUB_REPOSITORY" \
+            --head "$BRANCH_NAME" \
+            --state open \
+            --json url --jq '.[0].url')
+          
+          if [ -n "$PR_URL" ]; then
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          else
+            echo "没有找到 open 状态的 PR，可能创建失败"
+            exit 1
+          fi
+
       - name: Auto-merge PR
         if: steps.bump.outputs.pr_url
         env:
