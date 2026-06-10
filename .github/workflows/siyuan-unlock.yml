@@ -75,6 +75,24 @@ jobs:
           # 提取 PR URL（例如 https://github.com/owner/repo/pull/123）
           PR_URL=$(echo "$OUTPUT" | grep -o 'https://github.com/[^ ]*/pull/[0-9]*' | head -1)
           echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+      - name: Update PR branch
+        if: steps.bump.outputs.pr_url
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
+        run: |
+          PR_URL="${{ steps.bump.outputs.pr_url }}"
+          PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+          PR_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName')
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          
+          git fetch origin main
+          git checkout "$PR_BRANCH"
+          git merge origin/main --no-edit
+          git push origin "$PR_BRANCH"
+      
       - name: Auto-merge PR
         if: steps.bump.outputs.pr_url
         env:
@@ -82,5 +100,4 @@ jobs:
         run: |
           PR_URL="${{ steps.bump.outputs.pr_url }}"
           PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
-          # 自动合并（使用 merge 策略，可改为 squash 或 rebase）
-          gh pr merge "$PR_NUMBER" --auto --merge --delete-branch
+          gh pr merge "$PR_NUMBER" --merge --delete-branch
