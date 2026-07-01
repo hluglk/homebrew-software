@@ -2,7 +2,7 @@ name: Bump cask on new release
 
 on:
   schedule:
-    - cron: '0 8,14,20 * * 3'
+    - cron: '0 12 * * 3,4'
   workflow_dispatch:
 
 jobs:
