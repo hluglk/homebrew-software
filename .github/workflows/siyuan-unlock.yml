@@ -54,6 +54,7 @@ jobs:
         run: |
           brew tap --force "${GITHUB_REPOSITORY}"
           brew tap-info "${GITHUB_REPOSITORY}"
+          brew trust "${GITHUB_REPOSITORY}"
       - name: Delete existing remote branch (if any)
         if: steps.compare.outputs.new_version
         run: |
