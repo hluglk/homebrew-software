@@ -1,9 +1,9 @@
 cask "siyuan-unlock" do
   arch arm: "-arm64"
 
-  version "3.8.8"
-  sha256 arm:   "515a7ce90502408d6e8b1cd3620284512f04ba61486c8058da5bb7311a244de6",
-         intel: "061f2a519fa0f0b8ec488573f8ba56b0bb949a636a19ceade0808d055cea2381"
+  version "3.8.9"
+  sha256 arm:   "de8a38b47e206de531fb14d6a0348077508cee6d3a6130771b5f6200f3c35121",
+         intel: "1e875d625d9912d9c68581812f7a054132521552c5d0e05b4336a875c65e05f1"
 
   url "https://github.com/appdev/siyuan-unlock/releases/download/v#{version}/siyuan-#{version}-mac#{arch}.dmg"
   name "siyuan-unlock"
